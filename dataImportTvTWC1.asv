@@ -1,0 +1,94 @@
+function tab = dataImportTvTWC1(workbookFile,sheetName,endRow)
+
+%% Input handling
+    startRow = 2;
+    
+workbookFile=['Data/' workbookFile];
+%% Import the data
+[~, ~, raw] = xlsread(workbookFile, sheetName, sprintf('A%d:N%d',startRow(1),endRow(1)));
+for block=2:length(startRow)
+    [~, ~, tmpRawBlock] = xlsread(workbookFile, sheetName, sprintf('A%d:N%d',startRow(block),endRow(block)));
+    raw = [raw;tmpRawBlock]; %#ok<AGROW>
+end
+raw(cellfun(@(x) ~isempty(x) && isnumeric(x) && isnan(x),raw)) = {''};
+stringVectors = string(raw(:,[1,2,14]));
+stringVectors(ismissing(stringVectors)) = '';
+raw = raw(:,[3,4,5,6,7,8,9,10,11,12,13]);
+
+%% Replace non-numeric cells with NaN
+R = cellfun(@(x) ~isnumeric(x) && ~islogical(x),raw); % Find non-numeric cells
+raw(R) = {NaN}; % Replace non-numeric cells
+
+%% Create output variable
+I = cellfun(@(x) ischar(x), raw);
+raw(I) = {NaN};
+data = reshape([raw{:}],size(raw));
+
+%% Create table
+tableout = table;
+
+%% Allocate imported array to column variable names
+tableout.Team = stringVectors(:,1);
+tableout.Span = stringVectors(:,2);
+tableout.Mat = data(:,1);
+tableout.Won = data(:,2);
+tableout.Lost = data(:,3);
+tableout.Tied = data(:,4);
+tableout.NR = data(:,5);
+tableout.WL = data(:,6);
+tableout.Ave = data(:,7);
+tableout.RPO = data(:,8);
+tableout.Inns = data(:,9);
+tableout.HS = data(:,10);
+tableout.LS = data(:,11);
+
+%%
+len = size(tableout,1);
+for i=2:2:len
+    newRow(1,i/2).Opposition = tableout.Team{i,1}(3:end);
+end
+
+T1 = tableout([1:2:end],:);
+T2 = struct2table(newRow,'AsArray',true);
+T =[T1(:,1) T2 T1(:,2:end)];
+
+%%
+tab = 0.01*ones(10,10);
+WC_Teams = ["South Africa" "Sri Lanka" "New Zealand" "Bangladesh" "Afghanistan" "India" "England" "Pakistan" "West Indies" "Australia"]';
+
+for i = 1:numel(T.Team)
+    %T1 Team is not empty we will find its existance
+    if ~strcmp(T.Team(I),"")
+        %we weill check if the Team is one of the Worldcup teams and get
+%its index
+        me_idx = find(contains(WC_Teams,T.Team(i)),1);
+    end
+    %Now we will check if the me_index is empty or not
+    if isempty(me_idx)
+        %if me_index is empty we will skip the iteration
+        continue;
+    else
+        %           tab(me_idx,me_idx) = 1;
+        %Now we will find the index for opposition team for our table 
+        vs_idx = find(contains(WC_Teams,T.Opposition(i)),1);
+         if isempty(vs_idx)
+        %if vs_index is empty we will skip the iteration
+            continue;
+         else
+             %Me against Vs
+             val = (T.Won(i) + 0.5*T.Tied(i))/(T.Mat(i) - T.NR(i));
+             if val == 0
+                 val = 0.01;
+             elseif val == 1
+                 val = 0.99;
+             elseif isinf(val)
+                 val = 0.33;
+             elseif isnan(val)
+                 val = 0.33;
+             end
+             tab(me_idx,vs_idx) = val;
+         end
+    end
+end
+
+    

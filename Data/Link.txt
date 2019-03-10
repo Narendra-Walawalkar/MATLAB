@@ -1,0 +1,1 @@
+http://stats.espncricinfo.com/ci/engine/stats/index.html?class=2;type=team
